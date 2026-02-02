@@ -66,7 +66,8 @@ if use_vl_model:
     processor = AutoProcessor.from_pretrained(VL_MODEL_PATH, trust_remote_code=True, local_files_only=True)
     print("\nLFM2.5-VL-1.6B Interactive Chat")
     print("=" * 50)
-    print("Commands: i=image, v=video, n=text-only, quit=exit")
+    print("Type your question, then choose media type.")
+    print("Type 'quit' to exit.")
     print("=" * 50 + "\n")
 else:
     print("\nLoading LFM2.5-1.2B-Thinking (Text-only)...")
@@ -81,7 +82,7 @@ else:
     streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
     print("\nLFM2.5-1.2B-Thinking Interactive Chat")
     print("=" * 50)
-    print("Type 'quit' to exit.")
+    print("Enter prompts below. Type 'quit' to exit.")
     print("=" * 50 + "\n")
 
 # ============================================================================
@@ -89,18 +90,13 @@ else:
 # ============================================================================
 while True:
     try:
-        user_input = input("You: ").strip()
-
-        if user_input.lower() in {"quit", "exit", "q"}:
-            print("Goodbye!")
-            break
-
-        if not user_input:
-            print("Please enter a prompt...")
-            continue
-
         if use_vl_model:
-            media_choice = input("Media type? (i=image, v=video, n=none): ").strip().lower()
+            # VL model: ask for media type FIRST
+            media_choice = input("Media? [i]mage, [v]ideo, [n]one, or [q]uit: ").strip().lower()
+
+            if media_choice in {"q", "quit", "exit"}:
+                print("Goodbye!")
+                break
 
             # ----------------------------------------------------------------
             # VIDEO MODE: Extract frames at interval and describe each
@@ -139,6 +135,11 @@ while True:
                 interval_input = input("Analyze every N seconds (default=2): ").strip()
                 interval_seconds = float(interval_input) if interval_input else 2.0
                 frame_interval = int(fps * interval_seconds)
+
+                # Ask for prompt AFTER selecting video
+                user_input = input("Prompt: ").strip()
+                if not user_input:
+                    user_input = "Describe what you see in this frame."
 
                 print(f"Sampling every {interval_seconds}s ({frame_interval} frames)")
                 print("=" * 50)
@@ -238,7 +239,7 @@ while True:
             # ----------------------------------------------------------------
             # IMAGE MODE: Single image analysis
             # ----------------------------------------------------------------
-            elif media_choice in {"i", "image", "y", "yes"}:
+            elif media_choice in {"i", "image"}:
                 print("Opening file dialog for image...")
                 image_path = filedialog.askopenfilename(
                     title="Select an image",
@@ -250,25 +251,30 @@ while True:
                     ]
                 )
 
-                if image_path:
-                    try:
-                        print(f"Loading image: {image_path}")
-                        image = load_image(image_path)
-                        conversation = [
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "image", "image": image},
-                                    {"type": "text", "text": user_input},
-                                ],
-                            },
-                        ]
-                    except Exception as img_err:
-                        print(f"Error loading image: {img_err}")
-                        conversation = [{"role": "user", "content": [{"type": "text", "text": user_input}]}]
-                else:
+                if not image_path:
                     print("No image selected.")
-                    conversation = [{"role": "user", "content": [{"type": "text", "text": user_input}]}]
+                    continue
+
+                # Ask for prompt AFTER selecting image
+                user_input = input("Prompt: ").strip()
+                if not user_input:
+                    user_input = "Describe what you see in this image."
+
+                try:
+                    print(f"Loading image: {image_path}")
+                    image = load_image(image_path)
+                    conversation = [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "image", "image": image},
+                                {"type": "text", "text": user_input},
+                            ],
+                        },
+                    ]
+                except Exception as img_err:
+                    print(f"Error loading image: {img_err}")
+                    continue
 
                 print("Assistant: ", end="", flush=True)
 
@@ -292,7 +298,13 @@ while True:
             # ----------------------------------------------------------------
             # TEXT ONLY MODE
             # ----------------------------------------------------------------
-            else:
+            elif media_choice in {"n", "none", ""}:
+                # Ask for prompt
+                user_input = input("Prompt: ").strip()
+                if not user_input:
+                    print("Please enter a prompt...")
+                    continue
+
                 conversation = [{"role": "user", "content": [{"type": "text", "text": user_input}]}]
 
                 print("Assistant: ", end="", flush=True)
@@ -314,10 +326,27 @@ while True:
                 print(response)
                 print("\n" + "=" * 50)
 
+            # ----------------------------------------------------------------
+            # INVALID CHOICE
+            # ----------------------------------------------------------------
+            else:
+                print("Invalid choice. Use: i, v, n, or q")
+                continue
+
         # ====================================================================
         # Text-Only Model Mode
         # ====================================================================
         else:
+            user_input = input("Prompt: ").strip()
+
+            if user_input.lower() in {"quit", "exit", "q"}:
+                print("Goodbye!")
+                break
+
+            if not user_input:
+                print("Please enter a prompt...")
+                continue
+
             print("Assistant: ", end="", flush=True)
 
             messages = [{"role": "user", "content": user_input}]
