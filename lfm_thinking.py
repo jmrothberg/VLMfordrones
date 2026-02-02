@@ -21,9 +21,64 @@ import cv2
 import time
 import tkinter as tk
 from tkinter import filedialog
+import threading
+import queue
 
 # Hide tkinter root window
 tk.Tk().withdraw()
+
+# ============================================================================
+# TTS Setup (Optional)
+# ============================================================================
+TTS_ENABLED = False
+tts_engine = None
+tts_queue = None
+
+def init_tts():
+    """Initialize TTS engine if available."""
+    global tts_engine, tts_queue, TTS_ENABLED
+    try:
+        import pyttsx3
+        tts_engine = pyttsx3.init()
+        tts_engine.setProperty('rate', 175)
+        tts_queue = queue.Queue()
+        TTS_ENABLED = True
+        # Start TTS worker thread
+        tts_thread = threading.Thread(target=tts_worker, daemon=True)
+        tts_thread.start()
+        return True
+    except Exception as e:
+        print(f"TTS not available: {e}")
+        print("Install with: pip install pyttsx3")
+        return False
+
+def tts_worker():
+    """Background thread that speaks queued text."""
+    while True:
+        text = tts_queue.get()
+        if text is None:
+            break
+        if text.strip():
+            try:
+                tts_engine.say(text)
+                tts_engine.runAndWait()
+            except:
+                pass
+        tts_queue.task_done()
+
+def speak(text):
+    """Queue text to be spoken (non-blocking)."""
+    if TTS_ENABLED and tts_queue and text.strip():
+        tts_queue.put(text)
+
+def speak_sync(text):
+    """Speak text and wait for completion."""
+    if TTS_ENABLED and tts_engine and text.strip():
+        try:
+            tts_engine.say(text)
+            tts_engine.runAndWait()
+        except:
+            pass
 
 # Blackwell GPU optimizations
 os.environ.setdefault("CUDA_DEVICE_MAX_CONNECTIONS", "1")
@@ -50,6 +105,17 @@ while True:
     print("Please enter 1 or 2")
 
 use_vl_model = (choice == "2")
+
+# ============================================================================
+# TTS Option
+# ============================================================================
+tts_choice = input("Read output aloud? (y/n): ").strip().lower()
+if tts_choice in ('y', 'yes'):
+    if init_tts():
+        print("TTS enabled - responses will be read aloud")
+    else:
+        print("Continuing without TTS")
+print("=" * 50)
 
 # ============================================================================
 # Load Selected Model
@@ -196,6 +262,7 @@ while True:
 
                         print(f"\n[{timestamp:.1f}s] Scene {scene_count}:")
                         print(f"  {response}")
+                        speak(response)  # TTS for each scene
 
                         # Store for save
                         video_results.append({
@@ -293,6 +360,7 @@ while True:
                     response = response.split("assistant")[-1].strip()
 
                 print(response)
+                speak(response)  # TTS for image response
                 print("\n" + "=" * 50)
 
             # ----------------------------------------------------------------
@@ -324,6 +392,7 @@ while True:
                     response = response.split("assistant")[-1].strip()
 
                 print(response)
+                speak(response)  # TTS for text response
                 print("\n" + "=" * 50)
 
             # ----------------------------------------------------------------
@@ -371,6 +440,11 @@ while True:
                 max_new_tokens=512,
                 streamer=streamer,
             )
+
+            # TTS: decode and speak the response
+            if TTS_ENABLED:
+                response_text = tokenizer.decode(output[0][input_ids.shape[-1]:], skip_special_tokens=True)
+                speak(response_text)
 
             print("\n" + "=" * 50)
 
