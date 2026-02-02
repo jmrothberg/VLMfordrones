@@ -1,0 +1,28 @@
+# GLM-4.7-Flash-FP8-Dynamic Requirements for Blackwell GPUs
+
+# PyTorch with CUDA 12.1+ support (for Blackwell/Hopper GPUs)
+torch>=2.1.0
+torchvision>=0.16.0
+torchaudio>=2.1.0
+
+# Transformers with GLM support
+transformers>=4.40.0
+
+# Accelerate for model loading and device mapping
+accelerate>=0.28.0
+
+# BitsAndBytes for quantization support
+bitsandbytes>=0.43.0
+
+# Triton for Blackwell optimizations
+triton>=2.1.0
+
+# Additional dependencies
+numpy>=1.24.0
+opencv-python>=4.8.0  # For video processing
+Pillow>=10.0.0  # For image handling
+packaging>=23.0
+filelock>=3.12.0
+hf-transfer>=0.1.0  # Faster downloads from HuggingFace
+compressed-tensors
+torchvision
